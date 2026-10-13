@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a2e">
+<title>大前健身</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: #fff;
+    touch-action: none;
+    user-select: none; -webkit-user-select: none;
+  }
+  #app {
+    position: relative; width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    max-width: 480px; margin: 0 auto;
+    background: linear-gradient(180deg, #2d1b4e 0%, #1a1a2e 40%, #16213e 100%);
+  }
+  header {
+    flex: 0 0 auto;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 8px;
+    text-align: center;
+  }
+  header h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: 2px;
+    background: linear-gradient(90deg, #ff9a9e, #fecfef, #a18cd1);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header p { font-size: 12px; opacity: 0.65; margin-top: 4px; }
+  #hud {
+    flex: 0 0 auto;
+    padding: 8px 16px 4px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
+  }
+  .stat {
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .stat-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; margin-bottom: 4px; opacity: 0.9;
+  }
+  .stat-label span.val { font-variant-numeric: tabular-nums; opacity: 0.75; }
+  .bar {
+    height: 8px; border-radius: 99px; background: rgba(0,0,0,0.35);
+    overflow: hidden;
+  }
+  .bar > i {
+    display: block; height: 100%; width: 0%; border-radius: 99px;
+    transition: width 0.25s ease;
+  }
+  .bar.arm > i { background: linear-gradient(90deg, #ff6b6b, #ff9a9e); }
+  .bar.chest > i { background: linear-gradient(90deg, #feca57, #ff9ff3); }
+  .bar.leg > i { background: linear-gradient(90deg, #48dbfb, #0abde3); }
+  .bar.total > i { background: linear-gradient(90deg, #a18cd1, #fbc2eb); }
+  #level-row {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 2px;
+  }
+  #level-badge {
+    font-size: 13px; padding: 4px 12px; border-radius: 99px;
+    background: rgba(161,140,209,0.35); border: 1px solid rgba(251,194,235,0.4);
+  }
+  #tip {
+    font-size: 11px; opacity: 0.7; text-align: right; flex: 1; margin-left: 8px;
+  }
+  #stage-wrap {
+    flex: 1 1 auto; position: relative; min-height: 0;
+    display: flex; align-items: stretch; justify-content: center;
+  }
+  canvas#stage {
+    display: block; width: 100%; height: 100%;
+    touch-action: none; cursor: grab;
+  }
+  #float-msg {
+    position: absolute; left: 50%; top: 18%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    font-size: 18px; font-weight: 700;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    opacity: 0; transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  #float-msg.show { opacity: 1; }
+  footer {
+    flex: 0 0 auto;
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+    display: flex; gap: 10px; justify-content: center;
+  }
+  button {
+    appearance: none; border: none;
+    padding: 12px 20px; border-radius: 14px;
+    font-size: 14px; font-weight: 600; color: #fff;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    backdrop-filter: blur(8px);
+  }
+  button.primary {
+    background: linear-gradient(135deg, #a18cd1, #fbc2eb);
+    color: #2d1b4e; border: none;
+  }
+  button:active { transform: scale(0.97); opacity: 0.9; }
+  #overlay {
+    position: absolute; inset: 0; z-index: 20;
+    background: rgba(26,26,46,0.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px; text-align: center;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h2 { font-size: 28px; margin-bottom: 12px;
+    background: linear-gradient(90deg, #ff9a9e, #a18cd1);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #overlay .desc { font-size: 14px; line-height: 1.7; opacity: 0.8; max-width: 300px; margin-bottom: 24px; }
+  #overlay .desc b { color: #fbc2eb; font-weight: 600; }
+  #toast {
+    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 99px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    z-index: 10; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>大前健身</h1>
+    <p>拖动手臂上下举 · 帮他练出肌肉</p>
+  </header>
+  <div id="hud">
+    <div class="stat">
+      <div class="stat-label"><span>💪 臂力</span><span class="val" id="v-arm">0%</span></div>
+      <div class="bar arm"><i id="b-arm"></i></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label"><span>🫁 胸</span><span class="val" id="v-chest">0%</span></div>
+      <div class="bar chest"><i id="b-chest"></i></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label"><span>🦵 腿</span><span class="val" id="v-leg">0%</span></div>
+      <div class="bar leg"><i id="b-leg"></i></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label"><span>✨ 变壮</span><span class="val" id="v-total">Lv.0</span></div>
+      <div class="bar total"><i id="b-total"></i></div>
+    </div>
+    <div id="level-row">
+      <div id="level-badge">瘦竹竿 → 小肌肉</div>
+      <div id="tip">抓住手臂上下拖动</div>
+    </div>
+  </div>
+  <div id="stage-wrap">
+    <canvas id="stage"></canvas>
+    <div id="float-msg"></div>
+  </div>
+  <footer>
+    <button type="button" id="btn-reset">重置身材</button>
+    <button type="button" class="primary" id="btn-hint">怎么练？</button>
+  </footer>
+  <div id="toast"></div>
+  <div id="overlay">
+    <h2>大前健身</h2>
+    <div class="desc">
+      面前是个<strong>超级瘦</strong>的亚洲男生。<br>
+      用手指<strong>抓住他的手臂上下举</strong>，<br>
+      模拟帮他做健身 —— 练哪块，哪块就慢慢变壮。<br><br>
+      <b>左臂 / 右臂</b>：上下拖 → 臂力↑<br>
+      <b>双手一起举</b>：胸肌也会涨<br>
+      <b>拖大腿上下</b>：练腿
+    </div>
+    <button type="button" class="primary" id="btn-start" style="padding:14px 36px;font-size:16px;">开始健身</button>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const floatMsg = document.getElementById('float-msg');
+  const toastEl = document.getElementById('toast');
+  const overlay = document.getElementById('overlay');
+  const tipEl = document.getElementById('tip');
+  const levelBadge = document.getElementById('level-badge');
+
+  // Muscle stats 0..100
+  const stats = { armL: 0, armR: 0, chest: 0, leg: 0 };
+  let totalXP = 0;
+
+  // Pose angles (radians relative to natural hang)
+  // arm angle: 0 = hanging down, -Math.PI/2 = out to side-ish, positive = forward/up for raise
+  // We'll use raise: 0 hang, 1 fully up
+  const pose = {
+    armL: 0,   // 0 hang .. 1 raised up
+    armR: 0,
+    legL: 0,   // squat amount 0..1
+    legR: 0,
+    breathe: 0,
+    blink: 0,
+    blinkTimer: 2.5,
+    sweat: 0,
+    faceHappy: 0,
+  };
+
+  // Drag state
+  let drag = null; // { part, lastY, lastX, pumpAcc, dir, reps }
+  let dpr = 1;
+  let W = 0, H = 0;
+  let cx = 0, cy = 0, scale = 1;
+
+  // Hit regions in character-local coords (updated each frame conceptually)
+  const hits = {};
+
+  const LEVELS = [
+    { min: 0, name: '瘦竹竿' },
+    { min: 15, name: '有点肉了' },
+    { min: 35, name: '小肌肉' },
+    { min: 55, name: '健身新手' },
+    { min: 75, name: '健身房常客' },
+    { min: 90, name: '大前猛男' },
+  ];
+
+  function armAvg() { return (stats.armL + stats.armR) / 2; }
+  function totalScore() {
+    return (armAvg() * 0.4 + stats.chest * 0.3 + stats.leg * 0.3);
+  }
+  function levelName() {
+    const t = totalScore();
+    let name = LEVELS[0].name;
+    for (const L of LEVELS) if (t >= L.min) name = L.name;
+    return name;
+  }
+
+  function updateHUD() {
+    const a = Math.round(armAvg());
+    const c = Math.round(stats.chest);
+    const l = Math.round(stats.leg);
+    const t = totalScore();
+    document.getElementById('v-arm').textContent = a + '%';
+    document.getElementById('v-chest').textContent = c + '%';
+    document.getElementById('v-leg').textContent = l + '%';
+    document.getElementById('v-total').textContent = 'Lv.' + Math.floor(t / 10);
+    document.getElementById('b-arm').style.width = a + '%';
+    document.getElementById('b-chest').style.width = c + '%';
+    document.getElementById('b-leg').style.width = l + '%';
+    document.getElementById('b-total').style.width = Math.min(100, t) + '%';
+    levelBadge.textContent = levelName();
+  }
+
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  let floatTimer = 0;
+  function showFloat(msg, color) {
+    floatMsg.textContent = msg;
+    floatMsg.style.color = color || '#fbc2eb';
+    floatMsg.classList.add('show');
+    clearTimeout(floatTimer);
+    floatTimer = setTimeout(() => floatMsg.classList.remove('show'), 700);
+  }
+
+  function resize() {
+    const wrap = document.getElementById('stage-wrap');
+    const rect = wrap.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    W = Math.max(1, Math.floor(rect.width));
+    H = Math.max(1, Math.floor(rect.height));
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = W * 0.5;
+    cy = H * 0.52;
+    scale = Math.min(W, H) / 320;
+  }
+
+  // Skin tones — Asian-leaning warm light
+  const SKIN = '#e8b896';
+  const SKIN_SHADOW = '#d4a07a';
+  const SKIN_LIGHT = '#f0c9ad';
+  const HAIR = '#2a1f18';
+  const SHORTS = '#3d5a80';
+  const SHORTS_DARK = '#2c4059';
+  const MUSCLE_TINT = 'rgba(200,120,90,0.25)';
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  // Muscle morph factors 0..1
+  function mArm(side) {
+    const s = side === 'L' ? stats.armL : stats.armR;
+    return s / 100;
+  }
+  function mChest() { return stats.chest / 100; }
+  function mLeg() { return stats.leg / 100; }
+
+  function drawRoundedRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawCharacter(t) {
+    const breathe = Math.sin(t * 2.2) * 0.5 + 0.5;
+    pose.breathe = breathe;
+    pose.blinkTimer -= 1 / 60;
+    if (pose.blinkTimer <= 0) {
+      pose.blink = 1;
+      pose.blinkTimer = 2.2 + Math.random() * 3;
+    }
+    if (pose.blink > 0) pose.blink = Math.max(0, pose.blink - 0.15);
+
+    const armML = mArm('L');
+    const armMR = mArm('R');
+    const chestM = mChest();
+    const legM = mLeg();
+
+    // Character local: origin at pelvis, Y up negative in canvas so we flip
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+
+    // Soft floor shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(0, 118, 48 + chestM * 8, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // --- Legs ---
+    const thighW0 = 11;
+    const thighW = thighW0 + legM * 10;
+    const calfW0 = 8;
+    const calfW = calfW0 + legM * 6;
+    const squat = Math.max(pose.legL, pose.legR) * 18;
+
+    function drawLeg(side) {
+      const sx = side === 'L' ? -1 : 1;
+      const legRaise = side === 'L' ? pose.legL : pose.legR;
+      const hipX = sx * (10 + chestM * 4);
+      const hipY = 8 + squat * 0.3;
+      const kneeBend = legRaise * 0.5;
+      const footY = 108 - squat;
+
+      ctx.save();
+      ctx.translate(hipX, hipY);
+
+      // Thigh
+      ctx.fillStyle = SKIN;
+      ctx.beginPath();
+      const tw = thighW;
+      ctx.moveTo(-tw * 0.5, 0);
+      ctx.quadraticCurveTo(-tw * 0.55 - legM * 2, 28, -calfW * 0.5, 52 - kneeBend * 10);
+      ctx.lineTo(calfW * 0.5, 52 - kneeBend * 10);
+      ctx.quadraticCurveTo(tw * 0.55 + legM * 2, 28, tw * 0.5, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Calf
+      ctx.beginPath();
+      const cy0 = 50 - kneeBend * 10;
+      ctx.moveTo(-calfW * 0.45, cy0);
+      ctx.quadraticCurveTo(-calfW * 0.7 - legM * 2, cy0 + 28, -6, footY - hipY - 4);
+      ctx.lineTo(6, footY - hipY - 4);
+      ctx.quadraticCurveTo(calfW * 0.7 + legM * 2, cy0 + 28, calfW * 0.45, cy0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Quads highlight when muscular
+      if (legM > 0.2) {
+        ctx.fillStyle = MUSCLE_TINT;
+        ctx.beginPath();
+        ctx.ellipse(sx * 2, 22, 4 + legM * 3, 14 + legM * 6, 0.1 * sx, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Foot / shoe simple
+      ctx.fillStyle = '#2b2b2b';
+      ctx.beginPath();
+      ctx.ellipse(sx * 4, footY - hipY, 14, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // Hit zone for leg
+      hits['leg' + side] = {
+        x: cx + (hipX - 18 * sx) * scale,
+        y: cy + hipY * scale,
+        w: 36 * scale,
+        h: (footY - hipY) * scale,
+      };
+    }
+
+    drawLeg('L');
+    drawLeg('R');
+
+    // --- Pelvis / shorts ---
+    const hipW = 28 + chestM * 6 + legM * 4;
+    ctx.fillStyle = SHORTS;
+    drawRoundedRect(-hipW / 2, 0, hipW, 28, 8);
+    ctx.fill();
+    ctx.fillStyle = SHORTS_DARK;
+    drawRoundedRect(-4, 0, 8, 28, 2);
+    ctx.fill();
+    // waistband
+    ctx.fillStyle = '#4a6fa5';
+    drawRoundedRect(-hipW / 2 - 1, -2, hipW + 2, 6, 3);
+    ctx.fill();
+
+    // --- Torso ---
+    const chestBreath = breathe * (2 + chestM * 2);
+    const shoulderW = 36 + chestM * 28; // skinny → wide shoulders
+    const waistW = 22 + chestM * 6;
+    const torsoTop = -78 + chestBreath * 0.3;
+    const torsoBot = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(-waistW / 2, torsoBot);
+    ctx.quadraticCurveTo(-waistW / 2 - 2, -20, -shoulderW / 2, torsoTop + 18);
+    ctx.lineTo(-shoulderW / 2 + 2, torsoTop);
+    ctx.quadraticCurveTo(0, torsoTop - 4 - chestM * 2, shoulderW / 2 - 2, torsoTop);
+    ctx.lineTo(shoulderW / 2, torsoTop + 18);
+    ctx.quadraticCurveTo(waistW / 2 + 2, -20, waistW / 2, torsoBot);
+    ctx.closePath();
+    ctx.fillStyle = SKIN;
+    ctx.fill();
+
+    // Pecs when chest grows
+    if (chestM > 0.05) {
+      ctx.fillStyle = MUSCLE_TINT;
+      const pecR = 6 + chestM * 12;
+      ctx.beginPath();
+      ctx.ellipse(-10 - chestM * 4, torsoTop + 28, pecR, pecR * 0.75, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(10 + chestM * 4, torsoTop + 28, pecR, pecR * 0.75, 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      // sternum line
+      ctx.strokeStyle = 'rgba(180,100,70,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, torsoTop + 14);
+      ctx.lineTo(0, torsoTop + 40 + chestM * 10);
+      ctx.stroke();
+    }
+
+    // Abs hint when somewhat fit
+    if (chestM > 0.4 || armAvg() > 40) {
+      ctx.strokeStyle = 'rgba(180,100,70,0.18)';
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 3; i++) {
+        const ay = -8 - i * 12;
+        ctx.beginPath();
+        ctx.moveTo(-8, ay);
+        ctx.lineTo(8, ay);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(0, -8);
+      ctx.lineTo(0, -40);
+      ctx.stroke();
+    }
+
+    hits.chest = {
+      x: cx - (shoulderW / 2) * scale,
+      y: cy + torsoTop * scale,
+      w: shoulderW * scale,
+      h: (torsoBot - torsoTop) * scale,
+    };
+
+    // --- Arms ---
+    function drawArm(side) {
+      const sx = side === 'L' ? -1 : 1;
+      const raise = side === 'L' ? pose.armL : pose.armR;
+      const armM = side === 'L' ? armML : armMR;
+
+      // Shoulder joint
+      const shX = sx * (shoulderW / 2 - 2);
+      const shY = torsoTop + 14;
+
+      // Raise: hang (angle ~ PI/2 down) to up (angle ~ -PI/2-ish)
+      // Natural hang is angle = Math.PI * 0.55 from +X for right arm... 
+      // Use: angle from downward vertical. 0 = down, PI = up
+      const angleFromDown = raise * Math.PI * 0.95; // 0 hang, ~172deg up
+      // For left arm mirror
+      const ang = sx > 0
+        ? Math.PI / 2 - angleFromDown   // right: hang = PI/2 (pointing down in canvas? wait)
+        : -Math.PI / 2 + angleFromDown;
+
+      // Canvas Y increases downward. Hang = arm points +Y.
+      // Right arm hang: direction (0, 1). Raise toward up: rotate counterclockwise for right? 
+      // Actually for right arm raise like curl/press: rotate CCW from down → toward left/up for front view curl, or outward.
+      // For "举" (lift up): both arms go upward.
+      // Right arm: from angle = +90deg (down) toward angle = -90deg (up), rotating through outward (+0deg = right).
+      // Left arm: from -90? Let's define:
+      // angle 0 = pointing right (+X)
+      // hang right arm: angle = +PI/2
+      // raised right arm: angle = -PI/2 (or through 0)
+      // For outward raise: right goes PI/2 → 0 → -PI/2
+      // left goes PI/2 mirrored: hang left angle = PI/2 with sx... 
+
+      const hangAngle = Math.PI / 2; // both hang down in local if we flip X for left
+      const raiseAngle = -Math.PI / 2 + 0.15; // almost up
+      const a = hangAngle + (raiseAngle - hangAngle) * raise;
+
+      const upperLen = 38;
+      const lowerLen = 34;
+      // Elbow bend when raising (curl feel)
+      const elbowBend = Math.sin(raise * Math.PI) * (0.35 + armM * 0.2);
+
+      ctx.save();
+      ctx.translate(shX, shY);
+      // Mirror left side by scaling X
+      if (sx < 0) ctx.scale(-1, 1);
+
+      ctx.rotate(a);
+
+      // Upper arm width
+      const uw = 7 + armM * 12;
+      const bw = 5.5 + armM * 8; // bicep bulge radius extra
+
+      // Upper arm
+      ctx.fillStyle = SKIN;
+      ctx.beginPath();
+      ctx.moveTo(-uw * 0.45, 0);
+      // bicep bulge on "front" (toward body when curling — top of arm when raised)
+      ctx.quadraticCurveTo(-uw * 0.5 - armM * 6, upperLen * 0.45, -uw * 0.4, upperLen);
+      ctx.lineTo(uw * 0.4, upperLen);
+      ctx.quadraticCurveTo(uw * 0.55 + armM * 2, upperLen * 0.5, uw * 0.45, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bicep highlight
+      if (armM > 0.15) {
+        ctx.fillStyle = MUSCLE_TINT;
+        ctx.beginPath();
+        ctx.ellipse(-2 - armM * 3, upperLen * 0.4, 4 + armM * 5, 8 + armM * 8, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Elbow joint + forearm
+      ctx.translate(0, upperLen);
+      ctx.rotate(-elbowBend * (sx > 0 ? 1 : 1) * 1.2); // bend inward a bit
+
+      const fw = 6 + armM * 7;
+      ctx.fillStyle = SKIN;
+      ctx.beginPath();
+      ctx.moveTo(-fw * 0.4, 0);
+      ctx.quadraticCurveTo(-fw * 0.5, lowerLen * 0.5, -4, lowerLen);
+      ctx.lineTo(4, lowerLen);
+      ctx.quadraticCurveTo(fw * 0.5, lowerLen * 0.5, fw * 0.4, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Hand
+      ctx.fillStyle = SKIN_LIGHT;
+      ctx.beginPath();
+      ctx.ellipse(0, lowerLen + 6, 7, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Fist knuckles hint
+      ctx.fillStyle = SKIN_SHADOW;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.arc(i * 3.5, lowerLen + 3, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+      // World hit box approx for arm (shoulder to hand arc)
+      const handReach = upperLen + lowerLen;
+      const midX = shX + sx * Math.sin(raise * Math.PI) * handReach * 0.35;
+      const midY = shY + Math.cos(raise * Math.PI * 0.5) * handReach * 0.5;
+      // Simpler AABB covering arm swing range
+      const pad = 28 + armM * 10;
+      hits['arm' + side] = {
+        x: cx + (Math.min(shX, shX + sx * 40) - pad) * scale,
+        y: cy + (torsoTop - 10 - raise * 70) * scale,
+        w: (pad * 2 + 30) * scale,
+        h: (100 - raise * 20) * scale,
+      };
+      // Better: track hand position
+      // For right (sx=1): local rotate(a) then hand at (0, upper+lower)
+      // After rotate a from shoulder: hand = (sin(a)*len? wait rotate(a) then +Y means
+      // In canvas after rotate(a): local +Y goes to (sin(a), cos(a)) in parent... 
+      // rotate(a) transforms (0,L) -> (L*sin(a), L*cos(a))
+      const totalLen = upperLen + lowerLen * Math.cos(elbowBend);
+      let hx = totalLen * Math.sin(a);
+      let hy = totalLen * Math.cos(a);
+      if (sx < 0) hx = -hx;
+      hx += shX;
+      hy += shY;
+      hits['arm' + side] = {
+        x: cx + (Math.min(shX, hx) - 22) * scale,
+        y: cy + (Math.min(shY, hy) - 18) * scale,
+        w: (Math.abs(hx - shX) + 44) * scale,
+        h: (Math.abs(hy - shY) + 36) * scale,
+      };
+      hits['hand' + side] = { x: cx + (hx - 16) * scale, y: cy + (hy - 16) * scale, w: 32 * scale, h: 32 * scale };
+    }
+
+    drawArm('L');
+    drawArm('R');
+
+    // Shoulder caps
+    ctx.fillStyle = SKIN;
+    ctx.beginPath();
+    ctx.arc(-shoulderW / 2 + 2, torsoTop + 14, 8 + armML * 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(shoulderW / 2 - 2, torsoTop + 14, 8 + armMR * 6, 0, Math.PI * 2);
+    ctx.fill();
+    if (armML > 0.25) {
+      ctx.fillStyle = MUSCLE_TINT;
+      ctx.beginPath();
+      ctx.arc(-shoulderW / 2 + 2, torsoTop + 14, 5 + armML * 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (armMR > 0.25) {
+      ctx.fillStyle = MUSCLE_TINT;
+      ctx.beginPath();
+      ctx.arc(shoulderW / 2 - 2, torsoTop + 14, 5 + armMR * 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // --- Neck ---
+    ctx.fillStyle = SKIN;
+    drawRoundedRect(-7, torsoTop - 12, 14, 14, 4);
+    ctx.fill();
+
+    // --- Head ---
+    const headY = torsoTop - 28;
+    const headR = 22;
+    ctx.fillStyle = SKIN;
+    ctx.beginPath();
+    ctx.ellipse(0, headY, headR * 0.92, headR, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ears
+    ctx.beginPath();
+    ctx.ellipse(-headR * 0.88, headY + 2, 5, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(headR * 0.88, headY + 2, 5, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hair — short Asian black hair
+    ctx.fillStyle = HAIR;
+    ctx.beginPath();
+    ctx.ellipse(0, headY - 6, headR * 0.95, headR * 0.72, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    // bangs
+    ctx.beginPath();
+    ctx.moveTo(-headR * 0.9, headY - 2);
+    ctx.quadraticCurveTo(-12, headY - 18, 0, headY - 8);
+    ctx.quadraticCurveTo(12, headY - 18, headR * 0.9, headY - 2);
+    ctx.quadraticCurveTo(8, headY - 22, 0, headY - 24);
+    ctx.quadraticCurveTo(-8, headY - 22, -headR * 0.9, headY - 2);
+    ctx.fill();
+    // side hair
+    ctx.beginPath();
+    ctx.ellipse(-headR * 0.75, headY + 2, 6, 12, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(headR * 0.75, headY + 2, 6, 12, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyes
+    const eyeY = headY + 2;
+    const eyeOpen = 1 - pose.blink;
+    ctx.fillStyle = '#1a1a1a';
+    if (eyeOpen > 0.15) {
+      ctx.beginPath();
+      ctx.ellipse(-7, eyeY, 3.2, 3.8 * eyeOpen, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(7, eyeY, 3.2, 3.8 * eyeOpen, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // highlights
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-6, eyeY - 1.2 * eyeOpen, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(8, eyeY - 1.2 * eyeOpen, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-10, eyeY);
+      ctx.quadraticCurveTo(-7, eyeY + 2, -4, eyeY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(4, eyeY);
+      ctx.quadraticCurveTo(7, eyeY + 2, 10, eyeY);
+      ctx.stroke();
+    }
+
+    // Brows
+    ctx.strokeStyle = HAIR;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    const browLift = pose.faceHappy * 2;
+    ctx.beginPath();
+    ctx.moveTo(-11, eyeY - 8 - browLift);
+    ctx.lineTo(-4, eyeY - 9 - browLift);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(4, eyeY - 9 - browLift);
+    ctx.lineTo(11, eyeY - 8 - browLift);
+    ctx.stroke();
+
+    // Nose
+    ctx.strokeStyle = SKIN_SHADOW;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, eyeY + 4);
+    ctx.lineTo(-2, eyeY + 10);
+    ctx.stroke();
+
+    // Mouth — slight smile when training
+    ctx.strokeStyle = '#c47a6a';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    const mouthW = 5 + pose.faceHappy * 3;
+    const mouthCurve = 2 + pose.faceHappy * 4 + pose.sweat * 2;
+    ctx.moveTo(-mouthW, headY + 16);
+    ctx.quadraticCurveTo(0, headY + 16 + mouthCurve, mouthW, headY + 16);
+    ctx.stroke();
+
+    // Blush when working hard
+    if (pose.sweat > 0.3 || armAvg() + stats.chest > 20) {
+      ctx.fillStyle = 'rgba(255,140,140,' + (0.15 + pose.sweat * 0.25) + ')';
+      ctx.beginPath();
+      ctx.ellipse(-12, headY + 10, 5, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(12, headY + 10, 5, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Sweat drops
+    if (pose.sweat > 0.5) {
+      ctx.fillStyle = 'rgba(180,220,255,0.7)';
+      ctx.beginPath();
+      ctx.ellipse(-14, headY + 18, 2, 3, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(16, headY + 6, 2, 3.5, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Soft glow ring under feet when muscular
+    if (totalScore() > 50) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      ctx.strokeStyle = 'rgba(251,194,235,0.25)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 118, 55, 12, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawGuides() {
+    // Subtle glow on grabable parts when idle / not dragging
+    if (drag) return;
+    ctx.save();
+    ctx.globalAlpha = 0.15 + Math.sin(performance.now() / 400) * 0.08;
+    for (const key of ['armL', 'armR', 'legL', 'legR']) {
+      const h = hits[key];
+      if (!h) continue;
+      ctx.fillStyle = key.startsWith('arm') ? '#ff9a9e' : '#48dbfb';
+      ctx.beginPath();
+      ctx.roundRect(h.x, h.y, h.w, h.h, 12);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Polyfill roundRect
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      const rr = Math.min(r, w / 2, h / 2);
+      this.beginPath();
+      this.moveTo(x + rr, y);
+      this.arcTo(x + w, y, x + w, y + h, rr);
+      this.arcTo(x + w, y + h, x, y + h, rr);
+      this.arcTo(x, y + h, x, y, rr);
+      this.arcTo(x, y, x + w, y, rr);
+      this.closePath();
+    };
+  }
+
+  function hitTest(x, y) {
+    // Prefer hands/arms, then legs, then chest
+    const order = ['handL', 'handR', 'armL', 'armR', 'legL', 'legR', 'chest'];
+    for (const k of order) {
+      const h = hits[k];
+      if (!h) continue;
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+        if (k === 'handL' || k === 'armL') return 'armL';
+        if (k === 'handR' || k === 'armR') return 'armR';
+        return k;
+      }
+    }
+    // Fallback: left/right half of upper body = arm
+    const mid = cx;
+    if (y < cy + 40 * scale && y > cy - 120 * scale) {
+      return x < mid ? 'armL' : 'armR';
+    }
+    if (y >= cy + 20 * scale) {
+      return x < mid ? 'legL' : 'legR';
+    }
+    return null;
+  }
+
+  function gain(part, amount) {
+    const before = totalScore();
+    if (part === 'armL') stats.armL = clamp(stats.armL + amount, 0, 100);
+    if (part === 'armR') stats.armR = clamp(stats.armR + amount, 0, 100);
+    if (part === 'chest') stats.chest = clamp(stats.chest + amount, 0, 100);
+    if (part === 'legL' || part === 'legR' || part === 'leg') {
+      stats.leg = clamp(stats.leg + amount, 0, 100);
+    }
+    // Dual arm raise also trains chest a bit
+    if ((part === 'armL' || part === 'armR') && pose.armL > 0.5 && pose.armR > 0.5) {
+      stats.chest = clamp(stats.chest + amount * 0.35, 0, 100);
+    }
+    totalXP += amount;
+    pose.sweat = clamp(pose.sweat + amount * 0.08, 0, 1);
+    pose.faceHappy = clamp(pose.faceHappy + amount * 0.05, 0, 1);
+    updateHUD();
+    const after = totalScore();
+    for (const L of LEVELS) {
+      if (before < L.min && after >= L.min && L.min > 0) {
+        toast('晋升：' + L.name + '！');
+        showFloat('✨ ' + L.name, '#fbc2eb');
+      }
+    }
+  }
+
+  function onPointerDown(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX) - rect.left;
+    const y = (e.clientY !== undefined ? e.clientY : e.touches[0].clientY) - rect.top;
+    const part = hitTest(x, y);
+    if (!part) return;
+    drag = {
+      part,
+      lastY: y,
+      lastX: x,
+      pumpAcc: 0,
+      dir: 0,
+      reps: 0,
+      id: e.pointerId,
+    };
+    tipEl.textContent = part.startsWith('arm') ? '上下拖动手臂！' :
+      part.startsWith('leg') ? '上下拖动大腿深蹲！' : '抓住手臂举起来';
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+
+  function onPointerMove(e) {
+    if (!drag) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX) - rect.left;
+    const y = (e.clientY !== undefined ? e.clientY : e.touches[0].clientY) - rect.top;
+    const dy = drag.lastY - y; // up is positive work for "raise"
+    const dx = x - drag.lastX;
+
+    if (drag.part === 'armL' || drag.part === 'armR') {
+      const key = drag.part === 'armL' ? 'armL' : 'armR';
+      // Map vertical drag to raise 0..1
+      const delta = dy / (90 * scale);
+      pose[key] = clamp(pose[key] + delta, 0, 1);
+
+      // Detect pump: direction change counts as half-rep
+      const ndir = dy > 1.5 ? 1 : dy < -1.5 ? -1 : drag.dir;
+      if (ndir !== 0 && drag.dir !== 0 && ndir !== drag.dir) {
+        drag.reps++;
+        const amt = 0.55 + Math.min(1, Math.abs(dy) / 20) * 0.4;
+        gain(drag.part, amt);
+        if (drag.reps % 2 === 0) {
+          showFloat(drag.part === 'armL' ? '左臂 +' : '右臂 +', '#ff9a9e');
+        }
+        // Both arms high → chest
+        if (pose.armL > 0.55 && pose.armR > 0.55 && drag.reps % 2 === 0) {
+          gain('chest', 0.4);
+          showFloat('胸部锻炼！', '#feca57');
+        }
+      }
+      drag.dir = ndir || drag.dir;
+    } else if (drag.part === 'legL' || drag.part === 'legR') {
+      const key = drag.part;
+      const delta = -dy / (80 * scale); // drag down = squat deeper
+      pose[key] = clamp(pose[key] + delta, 0, 1);
+      // Mirror other leg a bit for squat feel
+      const other = key === 'legL' ? 'legR' : 'legL';
+      pose[other] = lerp(pose[other], pose[key], 0.4);
+
+      const ndir = dy > 1.5 ? 1 : dy < -1.5 ? -1 : drag.dir;
+      if (ndir !== 0 && drag.dir !== 0 && ndir !== drag.dir) {
+        drag.reps++;
+        gain('leg', 0.7);
+        if (drag.reps % 2 === 0) showFloat('腿部力量 +', '#48dbfb');
+      }
+      drag.dir = ndir || drag.dir;
+    } else if (drag.part === 'chest') {
+      // Rubbing chest / pushing both arms via torso — raise both arms slightly
+      pose.armL = clamp(pose.armL + dy / (100 * scale), 0, 1);
+      pose.armR = clamp(pose.armR + dy / (100 * scale), 0, 1);
+      if (Math.abs(dy) > 8) {
+        gain('chest', 0.15);
+      }
+    }
+
+    drag.lastY = y;
+    drag.lastX = x;
+  }
+
+  function onPointerUp(e) {
+    if (!drag) return;
+    e.preventDefault();
+    // Ease arms back slowly if released mid-air — keep pose a bit
+    tipEl.textContent = '抓住手臂上下拖动';
+    drag = null;
+  }
+
+  let lastT = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    // Idle return of limbs when not dragging that part
+    if (!drag || drag.part !== 'armL') pose.armL = lerp(pose.armL, 0, dt * 1.2);
+    if (!drag || drag.part !== 'armR') pose.armR = lerp(pose.armR, 0, dt * 1.2);
+    if (!drag || (drag.part !== 'legL' && drag.part !== 'legR')) {
+      pose.legL = lerp(pose.legL, 0, dt * 1.5);
+      pose.legR = lerp(pose.legR, 0, dt * 1.5);
+    }
+    pose.sweat = lerp(pose.sweat, 0, dt * 0.15);
+    pose.faceHappy = lerp(pose.faceHappy, Math.min(1, totalScore() / 80) * 0.5, dt * 0.5);
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Ambient particles
+    ctx.fillStyle = 'rgba(251,194,235,0.08)';
+    for (let i = 0; i < 6; i++) {
+      const px = (Math.sin(now / 2000 + i * 1.7) * 0.5 + 0.5) * W;
+      const py = ((now / 40 + i * 70) % (H + 40)) - 20;
+      ctx.beginPath();
+      ctx.arc(px, py, 2 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    drawCharacter(now / 1000);
+    // drawGuides(); // optional debug — keep off for polish
+
+    // Grip hint text near hands when very skinny (tutorial)
+    if (totalScore() < 5 && !drag) {
+      ctx.save();
+      ctx.font = '12px -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.textAlign = 'center';
+      ctx.fillText('👆 拖动手臂', cx, cy - 130 * scale);
+      ctx.restore();
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  // Events
+  canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+  canvas.addEventListener('pointermove', onPointerMove, { passive: false });
+  canvas.addEventListener('pointerup', onPointerUp, { passive: false });
+  canvas.addEventListener('pointercancel', onPointerUp, { passive: false });
+
+  document.getElementById('btn-start').addEventListener('click', () => {
+    overlay.classList.add('hidden');
+    toast('抓住他的手臂，上下举起来！');
+  });
+  document.getElementById('btn-hint').addEventListener('click', () => {
+    overlay.classList.remove('hidden');
+  });
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    stats.armL = stats.armR = stats.chest = stats.leg = 0;
+    totalXP = 0;
+    pose.armL = pose.armR = pose.legL = pose.legR = 0;
+    pose.sweat = 0;
+    updateHUD();
+    toast('已恢复成瘦竹竿');
+  });
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+
+  resize();
+  updateHUD();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
